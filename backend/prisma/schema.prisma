@@ -1,0 +1,46 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model RegistrationLink {
+  id               String         @id @default(cuid())
+  token            String         @unique @default(cuid())
+  ownerSecretHash  String
+  active           Boolean        @default(true)
+  maxRegistrations Int            @default(5)
+  registrations    Registration[]
+  otps             EmailOtp[]
+  createdAt        DateTime       @default(now())
+}
+
+model Registration {
+  id        String           @id @default(cuid())
+  name      String
+  email     String
+  linkId    String
+  link      RegistrationLink @relation(fields: [linkId], references: [id])
+  createdAt DateTime         @default(now())
+
+  @@unique([linkId, email])
+  @@index([linkId])
+}
+
+model EmailOtp {
+  id         String           @id @default(cuid())
+  email      String
+  codeHash   String
+  linkId     String
+  link       RegistrationLink @relation(fields: [linkId], references: [id])
+  expiresAt  DateTime
+  attempts   Int              @default(0)
+  verifiedAt DateTime?
+  createdAt  DateTime         @default(now())
+
+  @@index([linkId, email])
+}
