@@ -1,49 +1,54 @@
-
 "use client";
 
 import { useState } from "react";
-import { useParams } from "next/navigation";
+
+type CreatedLinkResponse = {
+  registrationUrl?: string;
+  message?: string | string[];
+};
 
 export default function RegisterPage() {
-  const params = useParams();
-  const token = params.token as string;
-
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [registrationUrl, setRegistrationUrl] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function registerUser(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function createRegistrationLink() {
     setLoading(true);
     setMessage("");
+    setRegistrationUrl("");
 
     try {
-      const response = await fetch(
-        `http://localhost:3002/registration-links/${token}/register`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ name, email }),
-        }
-      );
+      const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Registration failed");
+      if (!API_URL) {
+        throw new Error("API URL is not configured");
       }
 
-      setMessage(
-        `Registration successful! ${data.remainingSlots} slots remaining.`
-      );
-      setName("");
-      setEmail("");
+      const response = await fetch(`${API_URL}/registration-links`, {
+        method: "POST",
+      });
+      const data: CreatedLinkResponse = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          Array.isArray(data.message)
+            ? data.message.join(", ")
+            : data.message || "Could not create a registration link",
+        );
+      }
+
+      if (!data.registrationUrl) {
+        throw new Error("The backend response did not include a registration URL");
+      }
+
+      setRegistrationUrl(data.registrationUrl);
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Something went wrong"
+        error instanceof TypeError && error.message === "Failed to fetch"
+          ? "Could not reach the backend. Check that it is deployed, NEXT_PUBLIC_API_URL is correct, and its CORS settings allow this site."
+          : error instanceof Error
+            ? error.message
+            : "Something went wrong",
       );
     } finally {
       setLoading(false);
@@ -51,53 +56,40 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
-      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow">
-        <h1 className="mb-2 text-center text-3xl font-bold text-blue-700">
+    <main className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
+      <div className="w-full max-w-md rounded-xl bg-white p-8 text-center shadow">
+        <h1 className="mb-2 text-3xl font-bold text-blue-700">
           Event Registration
         </h1>
-
-        <p className="mb-6 text-center text-gray-600">
-          Enter your details to register.
+        <p className="mb-6 text-gray-600">
+          Create a registration link to share with participants.
         </p>
 
-        <form onSubmit={registerUser} className="space-y-4">
-          <div>
-            <label className="mb-1 block font-medium">Full Name</label>
-            <input
-              className="w-full rounded-lg border p-3"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Enter your name"
-              required
-            />
-          </div>
+        <button
+          className="w-full rounded-lg bg-blue-600 p-3 text-white disabled:opacity-50"
+          type="button"
+          onClick={createRegistrationLink}
+          disabled={loading}
+        >
+          {loading ? "Creating link..." : "Create registration link"}
+        </button>
 
-          <div>
-            <label className="mb-1 block font-medium">Email Address</label>
-            <input
-              className="w-full rounded-lg border p-3"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="Enter your email"
-              required
-            />
+        {registrationUrl && (
+          <div className="mt-4 break-all">
+            <p className="mb-2 text-sm text-gray-600">
+              Share this link with participants:
+            </p>
+            <a
+              className="text-blue-700 underline"
+              href={registrationUrl}
+            >
+              {registrationUrl}
+            </a>
           </div>
-
-          <button
-            className="w-full rounded-lg bg-blue-600 p-3 text-white hover:bg-blue-700 disabled:opacity-50"
-            type="submit"
-            disabled={loading}
-          >
-            {loading ? "Registering..." : "Register"}
-          </button>
-        </form>
+        )}
 
         {message && (
-          <p className="mt-4 text-center text-sm text-blue-700">
-            {message}
-          </p>
+          <p className="mt-4 text-center text-sm text-red-700">{message}</p>
         )}
       </div>
     </main>

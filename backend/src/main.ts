@@ -7,8 +7,12 @@ async function bootstrap() {
     instrument: ObserveInstrument,
   });
 
+  const frontendUrl = (
+    process.env.FRONTEND_URL ?? "http://localhost:3000"
+  ).replace(/\/+$/, "");
+
   app.enableCors({
-    origin: "http://localhost:3000",
+    origin: frontendUrl,
   });
 
   await app.listen(process.env.PORT ?? 3002);

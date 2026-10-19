@@ -31,6 +31,16 @@
 $ npm install
 ```
 
+## Frontend and backend configuration
+
+Deploy the backend separately from the Vercel frontend and configure:
+
+- `DATABASE_URL` on the backend to point to its PostgreSQL database.
+- `FRONTEND_URL` on the backend to the frontend origin, such as `https://event-registration-ochre.vercel.app`. This controls both CORS and the registration URLs returned when creating links.
+- `NEXT_PUBLIC_API_URL` in the Vercel frontend project to the deployed backend origin, such as `https://your-backend.example.com` (without an API path).
+
+Redeploy the frontend after changing `NEXT_PUBLIC_API_URL`. For local development, the backend defaults `FRONTEND_URL` to `http://localhost:3000`.
+
 ## Compile and run the project
 
 ```bash

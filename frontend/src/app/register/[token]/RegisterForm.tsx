@@ -21,8 +21,14 @@ export default function RegisterForm({ token }: Props) {
     setMessage("");
 
     try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
+
+      if (!API_URL) {
+        throw new Error("API URL is not configured");
+      }
+
       const response = await fetch(
-        `http://localhost:3002/registration-links/${token}/register`,
+        `${API_URL}/registration-links/${token}/register`,
         {
           method: "POST",
           headers: {
@@ -50,9 +56,11 @@ export default function RegisterForm({ token }: Props) {
       setEmail("");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong"
+        error instanceof TypeError && error.message === "Failed to fetch"
+          ? "Could not reach the backend. Check that it is deployed, NEXT_PUBLIC_API_URL is correct, and its CORS settings allow this site."
+          : error instanceof Error
+            ? error.message
+            : "Something went wrong"
       );
     } finally {
       setLoading(false);
