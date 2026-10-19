@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -13,23 +12,23 @@ export default function RegisterForm({ token }: Props) {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function registerUser(
-    event: React.FormEvent<HTMLFormElement>
-  ) {
+  async function registerUser(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setMessage("");
 
     try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
       const response = await fetch(
-        `http://localhost:3002/registration-links/${token}/register`,
+        `${API_URL}/registration-links/${token}/register`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ name, email }),
-        }
+        },
       );
 
       const data = await response.json();
@@ -38,21 +37,19 @@ export default function RegisterForm({ token }: Props) {
         throw new Error(
           Array.isArray(data.message)
             ? data.message.join(", ")
-            : data.message || "Registration failed"
+            : data.message || "Registration failed",
         );
       }
 
       setMessage(
-        `Registration successful! ${data.remainingSlots} slots remaining.`
+        `Registration successful! ${data.remainingSlots} slots remaining.`,
       );
 
       setName("");
       setEmail("");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong"
+        error instanceof Error ? error.message : "Something went wrong",
       );
     } finally {
       setLoading(false);
@@ -72,9 +69,7 @@ export default function RegisterForm({ token }: Props) {
 
         <form onSubmit={registerUser} className="space-y-4">
           <div>
-            <label className="mb-1 block font-medium">
-              Full Name
-            </label>
+            <label className="mb-1 block font-medium">Full Name</label>
             <input
               className="w-full rounded-lg border p-3"
               value={name}
@@ -85,9 +80,7 @@ export default function RegisterForm({ token }: Props) {
           </div>
 
           <div>
-            <label className="mb-1 block font-medium">
-              Email Address
-            </label>
+            <label className="mb-1 block font-medium">Email Address</label>
             <input
               className="w-full rounded-lg border p-3"
               type="email"
@@ -108,9 +101,7 @@ export default function RegisterForm({ token }: Props) {
         </form>
 
         {message && (
-          <p className="mt-4 text-center text-sm text-blue-700">
-            {message}
-          </p>
+          <p className="mt-4 text-center text-sm text-blue-700">{message}</p>
         )}
       </div>
     </main>

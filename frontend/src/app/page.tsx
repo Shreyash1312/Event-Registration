@@ -19,8 +19,14 @@ export default function RegisterPage() {
     setMessage("");
 
     try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+      if (!API_URL) {
+        throw new Error("API URL is not configured");
+      }
+
       const response = await fetch(
-        `http://localhost:3002/registration-links/${token}/register`,
+        `${API_URL}/registration-links/${token}/register`,
         {
           method: "POST",
           headers: {
@@ -33,12 +39,17 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Registration failed");
+        throw new Error(
+          Array.isArray(data.message)
+            ? data.message.join(", ")
+            : data.message || "Registration failed"
+        );
       }
 
       setMessage(
         `Registration successful! ${data.remainingSlots} slots remaining.`
       );
+
       setName("");
       setEmail("");
     } catch (error) {
