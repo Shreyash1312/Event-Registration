@@ -19,7 +19,7 @@ export default function RegisterPage() {
     setMessage("");
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL;
+      const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
 
       if (!API_URL) {
         throw new Error("API URL is not configured");
@@ -54,7 +54,11 @@ export default function RegisterPage() {
       setEmail("");
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Something went wrong"
+        error instanceof TypeError && error.message === "Failed to fetch"
+          ? "Could not reach the backend. Check that it is deployed, NEXT_PUBLIC_API_URL is correct, and its CORS settings allow this site."
+          : error instanceof Error
+            ? error.message
+            : "Something went wrong"
       );
     } finally {
       setLoading(false);

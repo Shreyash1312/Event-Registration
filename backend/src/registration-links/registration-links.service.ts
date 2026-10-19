@@ -35,9 +35,13 @@ export class RegistrationLinksService {
       },
     });
 
+    const frontendUrl = (
+      process.env.FRONTEND_URL ?? 'http://localhost:3000'
+    ).replace(/\/+$/, '');
+
     return {
       message: 'Registration link created successfully',
-      registrationUrl: `http://localhost:3000/register/${link.token}`,
+      registrationUrl: `${frontendUrl}/register/${link.token}`,
       ownerSecret,
       link,
     };
