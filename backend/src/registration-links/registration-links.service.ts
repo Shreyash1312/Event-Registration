@@ -49,7 +49,7 @@ export class RegistrationLinksService {
       data: {
         token,
         ownerSecretHash,
-        maxRegistrations: 5,
+        maxRegistrations: 100,
       },
       select: {
         id: true,

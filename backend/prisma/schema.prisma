@@ -13,7 +13,7 @@ model RegistrationLink {
   token            String         @unique @default(cuid())
   ownerSecretHash  String
   active           Boolean        @default(true)
-  maxRegistrations Int            @default(5)
+  maxRegistrations Int            @default(100)
   registrations    Registration[]
   otps             EmailOtp[]
   createdAt        DateTime       @default(now())
