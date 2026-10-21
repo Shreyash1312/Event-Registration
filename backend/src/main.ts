@@ -8,11 +8,11 @@ async function bootstrap() {
   });
 
   const frontendUrl = (
-    process.env.FRONTEND_URL ?? "http://localhost:3000"
+    process.env.FRONTEND_URL ?? "https://event-registration-ochre.vercel.app"
   ).replace(/\/+$/, "");
 
   app.enableCors({
-    origin: frontendUrl,
+    origin: [frontendUrl, "http://localhost:3000"],
   });
 
   await app.listen(process.env.PORT ?? 3002);
