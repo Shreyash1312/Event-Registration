@@ -1,4 +1,3 @@
-
 import {
   Injectable,
   NotFoundException,
@@ -10,9 +9,35 @@ import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
 export class RegistrationLinksService {
   constructor(private prisma: PrismaService) {}
-
-  // Create a registration link
+// Create or reuse the single registration link
   async createLink() {
+    const existingLink =
+      await this.prisma.registrationLink.findFirst({
+        orderBy: { createdAt: 'asc' },
+      });
+
+    const frontendUrl = (
+      process.env.FRONTEND_URL ??
+      'https://event-registration-ochre.vercel.app'
+    ).replace(/\/+$/, '');
+
+    // If a link already exists, reuse its token
+    if (existingLink) {
+      return {
+        message: 'Using existing registration link',
+        registrationUrl:
+          `${frontendUrl}/register/${existingLink.token}`,
+        link: {
+          id: existingLink.id,
+          token: existingLink.token,
+          active: existingLink.active,
+          maxRegistrations: existingLink.maxRegistrations,
+          createdAt: existingLink.createdAt,
+        },
+      };
+    }
+
+    // Generate a token only when no link exists
     const token = randomBytes(16).toString('hex');
     const ownerSecret = randomBytes(32).toString('hex');
 
@@ -34,10 +59,6 @@ export class RegistrationLinksService {
         createdAt: true,
       },
     });
-
-    const frontendUrl = (
-      process.env.FRONTEND_URL ?? 'https://event-registration-ochre.vercel.app'
-    ).replace(/\/+$/, '');
 
     return {
       message: 'Registration link created successfully',
