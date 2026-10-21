@@ -36,7 +36,7 @@ export class RegistrationLinksService {
     });
 
     const frontendUrl = (
-      process.env.FRONTEND_URL ?? 'http://localhost:3000'
+      process.env.FRONTEND_URL ?? 'https://event-registration-ochre.vercel.app'
     ).replace(/\/+$/, '');
 
     return {
