@@ -182,8 +182,8 @@ export class RegistrationLinksService {
     const registration = await this.prisma.registration.findFirst({
       where: {
         linkId: link.id,
-        name: cleanName,
-        email: cleanEmail,
+        name: { equals: cleanName, mode: 'insensitive' },
+        email: { equals: cleanEmail, mode: 'insensitive' },
       },
     });
 
