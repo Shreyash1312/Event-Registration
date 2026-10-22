@@ -1,11 +1,12 @@
-
 import {
   Controller,
   Post,
   Get,
+  Delete,
   Param,
   Body,
 } from '@nestjs/common';
+
 import { RegistrationLinksService } from './registration-links.service';
 
 @Controller('registration-links')
@@ -30,6 +31,18 @@ export class RegistrationLinksController {
     @Body() body: { name: string; email: string },
   ) {
     return this.registrationLinksService.registerParticipant(
+      token,
+      body.name,
+      body.email,
+    );
+  }
+
+  @Delete(':token/register')
+  cancelRegistration(
+    @Param('token') token: string,
+    @Body() body: { name: string; email: string },
+  ) {
+    return this.registrationLinksService.cancelRegistration(
       token,
       body.name,
       body.email,

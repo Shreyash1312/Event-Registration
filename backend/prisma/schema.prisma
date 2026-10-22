@@ -20,12 +20,13 @@ model RegistrationLink {
 }
 
 model Registration {
-  id        String           @id @default(cuid())
-  name      String
-  email     String
-  linkId    String
-  link      RegistrationLink @relation(fields: [linkId], references: [id])
-  createdAt DateTime         @default(now())
+  id                     String           @id @default(cuid())
+  name                   String
+  email                  String
+  linkId                 String
+  link                   RegistrationLink @relation(fields: [linkId], references: [id])
+  cancellationSecretHash String?
+  createdAt              DateTime         @default(now())
 
   @@unique([linkId, email])
   @@index([linkId])
