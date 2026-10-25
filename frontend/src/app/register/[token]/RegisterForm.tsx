@@ -12,17 +12,110 @@ export default function RegisterForm({ token }: Props) {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+
   const [cancelName, setCancelName] = useState("");
   const [cancelEmail, setCancelEmail] = useState("");
   const [cancelling, setCancelling] = useState(false);
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
+
+  async function sendOtp() {
+    setSendingOtp(true);
+    setMessage("");
+    setOtp("");
+    setOtpSent(false);
+    setOtpVerified(false);
+
+    try {
+      if (!API_URL) throw new Error("API URL is not configured");
+
+      const response = await fetch(
+        `${API_URL}/registration-links/${token}/send-otp`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          Array.isArray(data.message)
+            ? data.message.join(", ")
+            : data.message || "Could not generate OTP",
+        );
+      }
+
+      setOtpSent(true);
+      setMessage(`Development OTP: ${data.otp}`);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Something went wrong",
+      );
+    } finally {
+      setSendingOtp(false);
+    }
+  }
+
+  async function verifyOtp() {
+    setVerifyingOtp(true);
+    setMessage("");
+
+    try {
+      if (!API_URL) throw new Error("API URL is not configured");
+
+      const response = await fetch(
+        `${API_URL}/registration-links/${token}/verify-otp`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            otp: otp.trim(),
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          Array.isArray(data.message)
+            ? data.message.join(", ")
+            : data.message || "OTP verification failed",
+        );
+      }
+
+      setOtpVerified(true);
+      setMessage("OTP verified successfully! You can now register.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Something went wrong",
+      );
+    } finally {
+      setVerifyingOtp(false);
+    }
+  }
+
   async function registerUser(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!otpVerified) {
+      setMessage("Please verify your email OTP before registering.");
+      return;
+    }
+
     setLoading(true);
     setMessage("");
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
       if (!API_URL) throw new Error("API URL is not configured");
 
       const response = await fetch(
@@ -30,7 +123,10 @@ export default function RegisterForm({ token }: Props) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: name.trim(), email: email.trim() }),
+          body: JSON.stringify({
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+          }),
         },
       );
 
@@ -49,8 +145,13 @@ export default function RegisterForm({ token }: Props) {
       );
       setName("");
       setEmail("");
+      setOtp("");
+      setOtpSent(false);
+      setOtpVerified(false);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Something went wrong");
+      setMessage(
+        error instanceof Error ? error.message : "Something went wrong",
+      );
     } finally {
       setLoading(false);
     }
@@ -69,7 +170,6 @@ export default function RegisterForm({ token }: Props) {
     setMessage("");
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
       if (!API_URL) throw new Error("API URL is not configured");
 
       const response = await fetch(
@@ -100,7 +200,9 @@ export default function RegisterForm({ token }: Props) {
       setCancelName("");
       setCancelEmail("");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Something went wrong");
+      setMessage(
+        error instanceof Error ? error.message : "Something went wrong",
+      );
     } finally {
       setCancelling(false);
     }
@@ -135,16 +237,68 @@ export default function RegisterForm({ token }: Props) {
               className="w-full rounded-lg border p-3"
               type="email"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setOtp("");
+                setOtpSent(false);
+                setOtpVerified(false);
+                setMessage("");
+              }}
               placeholder="Enter your email"
               required
             />
           </div>
 
           <button
+            className="w-full rounded-lg bg-indigo-600 p-3 text-white disabled:opacity-50"
+            type="button"
+            onClick={sendOtp}
+            disabled={sendingOtp || !email.trim()}
+          >
+            {sendingOtp ? "Generating OTP..." : "Send OTP"}
+          </button>
+
+          {otpSent && (
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block font-medium">Enter OTP</label>
+                <input
+                  className="w-full rounded-lg border p-3"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(event) => {
+                    setOtp(event.target.value.replace(/\D/g, ""));
+                    setOtpVerified(false);
+                  }}
+                  placeholder="Enter 123456"
+                  required
+                />
+              </div>
+
+              <button
+                className="w-full rounded-lg bg-indigo-600 p-3 text-white disabled:opacity-50"
+                type="button"
+                onClick={verifyOtp}
+                disabled={
+                  verifyingOtp || otp.trim().length !== 6 || otpVerified
+                }
+              >
+                {verifyingOtp
+                  ? "Verifying..."
+                  : otpVerified
+                    ? "OTP Verified"
+                    : "Verify OTP"}
+              </button>
+            </div>
+          )}
+
+          <button
             className="w-full rounded-lg bg-blue-600 p-3 text-white disabled:opacity-50"
             type="submit"
-            disabled={loading}
+            disabled={loading || !otpVerified}
           >
             {loading ? "Registering..." : "Register"}
           </button>
@@ -166,7 +320,9 @@ export default function RegisterForm({ token }: Props) {
 
         <form onSubmit={cancelUserRegistration} className="space-y-4">
           <div>
-            <label className="mb-1 block font-medium">Registered Full Name</label>
+            <label className="mb-1 block font-medium">
+              Registered Full Name
+            </label>
             <input
               className="w-full rounded-lg border p-3"
               value={cancelName}

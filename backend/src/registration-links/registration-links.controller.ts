@@ -20,6 +20,29 @@ export class RegistrationLinksController {
     return this.registrationLinksService.createLink();
   }
 
+  @Post(':token/send-otp')
+  sendOtp(
+    @Param('token') token: string,
+    @Body() body: { email: string },
+  ) {
+    return this.registrationLinksService.sendOtp(
+      token,
+      body.email,
+    );
+  }
+
+  @Post(':token/verify-otp')
+  verifyOtp(
+    @Param('token') token: string,
+    @Body() body: { email: string; otp: string },
+  ) {
+    return this.registrationLinksService.verifyOtp(
+      token,
+      body.email,
+      body.otp,
+    );
+  }
+
   @Get(':token')
   checkLink(@Param('token') token: string) {
     return this.registrationLinksService.getLink(token);

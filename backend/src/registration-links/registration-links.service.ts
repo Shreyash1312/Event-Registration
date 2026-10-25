@@ -10,6 +10,100 @@ import { PrismaService } from '../prisma/prisma.service';
 export class RegistrationLinksService {
   constructor(private prisma: PrismaService) {}
 
+  // Development-only dummy OTP
+  async sendOtp(token: string, email: string) {
+    const cleanEmail = email?.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      throw new BadRequestException('Email is required');
+    }
+
+    const link = await this.prisma.registrationLink.findUnique({
+      where: { token },
+    });
+
+    if (!link || !link.active) {
+      throw new NotFoundException(
+        'Registration link is invalid or inactive',
+      );
+    }
+
+    const code = '123456';
+    const codeHash = createHash('sha256')
+      .update(code)
+      .digest('hex');
+
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    await this.prisma.emailOtp.create({
+      data: {
+        email: cleanEmail,
+        codeHash,
+        linkId: link.id,
+        expiresAt,
+        attempts: 0,
+        verifiedAt: null,
+      },
+    });
+
+    return {
+      message: 'Development OTP generated successfully',
+      // For local testing only; remove before production.
+      otp: code,
+      expiresInMinutes: 5,
+    };
+  }
+
+  // Development-only OTP verification
+  async verifyOtp(token: string, email: string, otp: string) {
+    const cleanEmail = email?.trim().toLowerCase();
+
+    if (!cleanEmail || !otp) {
+      throw new BadRequestException('Email and OTP are required');
+    }
+
+    const link = await this.prisma.registrationLink.findUnique({
+      where: { token },
+    });
+
+    if (!link || !link.active) {
+      throw new NotFoundException(
+        'Registration link is invalid or inactive',
+      );
+    }
+
+    const otpRecord = await this.prisma.emailOtp.findFirst({
+      where: {
+        linkId: link.id,
+        email: cleanEmail,
+        verifiedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!otpRecord) {
+      throw new BadRequestException(
+        'OTP expired or not requested. Please request a new OTP.',
+      );
+    }
+
+    const expectedHash = createHash('sha256')
+      .update('123456')
+      .digest('hex');
+
+    if (otp !== '123456' || otpRecord.codeHash !== expectedHash) {
+      throw new BadRequestException('Invalid OTP');
+    }
+
+    await this.prisma.emailOtp.update({
+      where: { id: otpRecord.id },
+      data: { verifiedAt: new Date() },
+    });
+
+    return { message: 'OTP verified successfully' };
+  }
+
   // Create or reuse the registration link
   async createLink() {
     const existingLink = await this.prisma.registrationLink.findFirst({
@@ -132,12 +226,37 @@ export class RegistrationLinksService {
       );
     }
 
+    const verifiedOtp = await this.prisma.emailOtp.findFirst({
+      where: {
+        linkId: link.id,
+        email: cleanEmail,
+        verifiedAt: { not: null },
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!verifiedOtp) {
+      throw new BadRequestException(
+        'Please verify your email with OTP before registering',
+      );
+    }
+
+    await this.prisma.emailOtp.update({
+      where: { id: verifiedOtp.id },
+      data: { verifiedAt: null },
+    });
+
     await this.prisma.registration.create({
       data: {
         name: cleanName,
         email: cleanEmail,
         linkId: link.id,
       },
+    });
+
+    await this.prisma.emailOtp.delete({
+      where: { id: verifiedOtp.id },
     });
 
     const total = await this.prisma.registration.count({
