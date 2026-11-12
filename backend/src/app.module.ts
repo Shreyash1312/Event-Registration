@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { RegistrationLinksModule } from './registration-links/registration-links.module';
+import { PaymentsModule } from './payments/payments.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -24,6 +25,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
     PrismaModule,
     RegistrationLinksModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

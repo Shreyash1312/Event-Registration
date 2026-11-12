@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -5,6 +6,40 @@ import { useState } from "react";
 type Props = {
   token: string;
 };
+
+type RazorpaySuccessResponse = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+type RazorpayOptions = {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill: {
+    name: string;
+    email: string;
+  };
+  theme: {
+    color: string;
+  };
+  handler: (response: RazorpaySuccessResponse) => void;
+  modal?: {
+    ondismiss?: () => void;
+  };
+};
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayOptions) => {
+      open: () => void;
+    };
+  }
+}
 
 export default function RegisterForm({ token }: Props) {
   const [name, setName] = useState("");
@@ -24,6 +59,21 @@ export default function RegisterForm({ token }: Props) {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
 
+  async function loadRazorpayScript(): Promise<boolean> {
+    if (window.Razorpay) return true;
+
+    return new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+
+      document.body.appendChild(script);
+    });
+  }
+
   async function sendOtp() {
     setSendingOtp(true);
     setMessage("");
@@ -39,7 +89,9 @@ export default function RegisterForm({ token }: Props) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: email.trim().toLowerCase() }),
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+          }),
         },
       );
 
@@ -94,7 +146,7 @@ export default function RegisterForm({ token }: Props) {
       }
 
       setOtpVerified(true);
-      setMessage("OTP verified successfully! You can now register.");
+      setMessage("OTP verified successfully! You can now pay ₹100.");
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Something went wrong",
@@ -104,11 +156,14 @@ export default function RegisterForm({ token }: Props) {
     }
   }
 
-  async function registerUser(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function startPayment() {
     if (!otpVerified) {
-      setMessage("Please verify your email OTP before registering.");
+      setMessage("Please verify your email OTP first.");
+      return;
+    }
+
+    if (!name.trim() || !email.trim()) {
+      setMessage("Please enter your name and email.");
       return;
     }
 
@@ -116,10 +171,20 @@ export default function RegisterForm({ token }: Props) {
     setMessage("");
 
     try {
-      if (!API_URL) throw new Error("API URL is not configured");
+      if (!API_URL) {
+        throw new Error("API URL is not configured");
+      }
 
-      const response = await fetch(
-        `${API_URL}/registration-links/${token}/register`,
+      // Load Razorpay Checkout script
+      const scriptLoaded = await loadRazorpayScript();
+
+      if (!scriptLoaded || !window.Razorpay) {
+        throw new Error("Could not load Razorpay Checkout. Please try again.");
+      }
+
+      // Step 1: Create Razorpay order
+      const orderResponse = await fetch(
+        `${API_URL}/payments/${token}/create-order`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -130,29 +195,93 @@ export default function RegisterForm({ token }: Props) {
         },
       );
 
-      const data = await response.json();
+      const orderData = await orderResponse.json();
 
-      if (!response.ok) {
+      if (!orderResponse.ok) {
         throw new Error(
-          Array.isArray(data.message)
-            ? data.message.join(", ")
-            : data.message || "Registration failed",
+          Array.isArray(orderData.message)
+            ? orderData.message.join(", ")
+            : orderData.message || "Could not create payment order",
         );
       }
 
-      setMessage(
-        `Registration successful! ${data.remainingSlots ?? ""} slots remaining.`,
-      );
-      setName("");
-      setEmail("");
-      setOtp("");
-      setOtpSent(false);
-      setOtpVerified(false);
+      // Step 2: Open Razorpay Checkout
+      const options: RazorpayOptions = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "Event Registration",
+        description: "Event registration fee",
+        order_id: orderData.orderId,
+
+        prefill: {
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+        },
+
+        theme: {
+          color: "#2563eb",
+        },
+
+        // Step 3: Verify payment on backend
+        handler: async function (paymentResponse) {
+          try {
+            setMessage("Payment received. Verifying payment...");
+
+            const verifyResponse = await fetch(
+              `${API_URL}/payments/verify`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(paymentResponse),
+              },
+            );
+
+            const verifyData = await verifyResponse.json();
+
+            if (!verifyResponse.ok) {
+              throw new Error(
+                Array.isArray(verifyData.message)
+                  ? verifyData.message.join(", ")
+                  : verifyData.message || "Payment verification failed",
+              );
+            }
+
+            // Registration is confirmed by backend
+            setMessage(
+              "Payment successful! Your event registration is confirmed.",
+            );
+
+            setName("");
+            setEmail("");
+            setOtp("");
+            setOtpSent(false);
+            setOtpVerified(false);
+          } catch (error) {
+            setMessage(
+              error instanceof Error
+                ? error.message
+                : "Payment verification failed. Please contact support.",
+            );
+          } finally {
+            setLoading(false);
+          }
+        },
+
+        modal: {
+          ondismiss: () => {
+            setLoading(false);
+            setMessage("Payment window closed. You can try again.");
+          },
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Something went wrong",
+        error instanceof Error ? error.message : "Payment failed",
       );
-    } finally {
       setLoading(false);
     }
   }
@@ -197,6 +326,7 @@ export default function RegisterForm({ token }: Props) {
       setMessage(
         `Registration cancelled successfully! ${data.remainingSlots ?? ""} slots remaining.`,
       );
+
       setCancelName("");
       setCancelEmail("");
     } catch (error) {
@@ -216,10 +346,16 @@ export default function RegisterForm({ token }: Props) {
         </h1>
 
         <p className="mb-6 text-center text-gray-600">
-          Register for the event or cancel your existing registration.
+          Complete your registration with a payment of ₹100.
         </p>
 
-        <form onSubmit={registerUser} className="space-y-4">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            startPayment();
+          }}
+          className="space-y-4"
+        >
           <div>
             <label className="mb-1 block font-medium">Full Name</label>
             <input
@@ -253,7 +389,7 @@ export default function RegisterForm({ token }: Props) {
             className="w-full rounded-lg bg-indigo-600 p-3 text-white disabled:opacity-50"
             type="button"
             onClick={sendOtp}
-            disabled={sendingOtp || !email.trim()}
+            disabled={sendingOtp || !email.trim() || otpVerified}
           >
             {sendingOtp ? "Generating OTP..." : "Send OTP"}
           </button>
@@ -273,7 +409,7 @@ export default function RegisterForm({ token }: Props) {
                     setOtp(event.target.value.replace(/\D/g, ""));
                     setOtpVerified(false);
                   }}
-                  placeholder="Enter 123456"
+                  placeholder="Enter OTP"
                   required
                 />
               </div>
@@ -296,16 +432,18 @@ export default function RegisterForm({ token }: Props) {
           )}
 
           <button
-            className="w-full rounded-lg bg-blue-600 p-3 text-white disabled:opacity-50"
+            className="w-full rounded-lg bg-blue-600 p-3 font-semibold text-white disabled:opacity-50"
             type="submit"
             disabled={loading || !otpVerified}
           >
-            {loading ? "Registering..." : "Register"}
+            {loading ? "Processing Payment..." : "Pay ₹100 & Register"}
           </button>
         </form>
 
         {message && (
-          <p className="mt-4 text-center text-sm text-blue-700">{message}</p>
+          <p className="mt-4 text-center text-sm text-blue-700">
+            {message}
+          </p>
         )}
 
         <hr className="my-6" />

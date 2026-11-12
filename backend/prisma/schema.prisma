@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,10 +12,11 @@ model RegistrationLink {
   token            String         @unique @default(cuid())
   ownerSecretHash  String
   active           Boolean        @default(true)
-  maxRegistrations Int            @default(100)
+  maxRegistrations Int            @default(5)
   registrations    Registration[]
   otps             EmailOtp[]
   createdAt        DateTime       @default(now())
+  payments         Payment[]
 }
 
 model Registration {
@@ -43,5 +43,28 @@ model EmailOtp {
   verifiedAt DateTime?
   createdAt  DateTime         @default(now())
 
+  @@index([linkId, email])
+}
+
+model Payment {
+  id     String           @id @default(cuid())
+  linkId String
+  link   RegistrationLink @relation(fields: [linkId], references: [id])
+
+  name  String
+  email String
+
+  orderId   String  @unique
+  paymentId String? @unique
+
+  amount   Int    @default(10000)
+  currency String @default("INR")
+  status   String @default("PENDING")
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([linkId, status])
   @@index([linkId, email])
 }
